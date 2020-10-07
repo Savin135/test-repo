@@ -10,53 +10,70 @@ app.use(cors());
 
 
 app.get('/', (req, res) => {
-    res.send('Hello world');
+  res.send('Hello world');
 });
 
 
 app.post('/payment', (req, res) => {
-    const {product, token} = req.body;
-    console.log("PRODUCT ", product);
-    console.log("PRICE ", product.price);
-    const idempotencyKey = uuidv4();
+  const { product, token } = req.body;
+  console.log("PRODUCT ", product);
+  console.log("PRICE ", product.price);
+  const idempotencyKey = uuidv4();
 
-    return stripe.customers.create({
-        email: token.email,
-        source: token.id
-    }).then(customer => {
-        stripe.charges.create({
-            amount: product.price * 100,
-            currency: 'usd',
-            customer: customer.id,
-            reciept_email: token.email,
-            description: 'product desc'
-        },{idempotencyKey})
-        .then(result => res.status(200).json(result))
-        .catch(err => console.log(err))
-    })
+  return stripe.customers.create({
+    email: token.email,
+    source: token.id
+  }).then(customer => {
+    stripe.charges.create({
+      amount: product.price * 100,
+      currency: 'usd',
+      customer: customer.id,
+      reciept_email: token.email,
+      description: 'product desc'
+    }, { idempotencyKey })
+      .then(result => res.status(200).json(result))
+      .catch(err => console.log(err))
+  })
 });
 
 app.post('/create-checkout-session', async (req, res) => {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'inr',
-            product_data: {
-              name: 'T-shirt',
-            },
-            unit_amount: 2000,
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: 'http://localhost:4200/',
-      cancel_url: 'http://localhost:4200/',
-    });
-  console.log(session);
-    res.json({ id: session.id });
-  });
+  const session = await stripe.checkout.sessions.create({
+    payment_intent_data: {
+      setup_future_usage: 'off_session',
+    },
+    customer: req.body.customerId,
+    payment_method_types: ['card'],
+    line_items: [{
+      price: `${req.body.priceId}`,
+      quantity: 1,
+    }],
+    mode: 'payment',
+    success_url: 'http://localhost:4200/',
+    cancel_url: 'http://localhost:4200/',
+  },
+    { stripeAccount: `${req.body.connectedAcc}` }
+  );
 
-app.listen(3000, () => console.log('Listening on port 3000'));
+  // const session = await stripe.checkout.sessions.create({
+  //   payment_method_types: ['card'],
+  //   line_items: [
+  //     {
+  //       price_data: {
+  //         currency: 'inr',
+  //         product_data: {
+  //           name: 'T-shirt',
+  //         },
+  //         unit_amount: 2000,
+  //       },
+  //       quantity: 1,
+  //     },
+  //   ],
+  //   mode: 'payment',
+  //   success_url: 'http://localhost:4200/',
+  //   cancel_url: 'http://localhost:4200/',
+  // });
+  console.log(session);
+  res.json({ id: session.id });
+});
+
+app.listen(3001, () => console.log('Listening on port 3001'));
